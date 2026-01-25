@@ -17,32 +17,21 @@ object DeepUrls {
     }
 
     /** Public function for SDK users to create deep links */
-    fun createLink(
-        route: String,
-        params: Map<String, Any> = emptyMap(),
-        useShort: Boolean = true,
-        callback: (success: Boolean, url: String?, longUrl: String?) -> Unit
-    ) {
-        // Delegate to internal ApiClient
+    fun createLink(route: String, params: Map<String, Any> = emptyMap(), useShort: Boolean = true, callback: (success: Boolean, url: String?, longUrl: String?) -> Unit) {
         ApiClient.createLink(route, params, useShort, callback)
     }
 
     /** Load JSON config from assets */
     private fun loadConfig(context: Context) {
         try {
-            val inputStream: InputStream = context.assets.open("deepurls_config.json")
+            val inputStream: InputStream = context.assets.open("deepUrlsConfig.json")
             val jsonStr = inputStream.bufferedReader().use { it.readText() }
             val jsonObj = JSONObject(jsonStr)
-
-            // Load all fields from JSON
             config = DeepUrlsConfig(
                 appId = jsonObj.getString("appId"),
-                apiKey = jsonObj.getString("apiKey"),
-                apiUrl = jsonObj.getString("apiUrl"),
+                deepKey = jsonObj.getString("deepKey"),
             )
-
             Log.d(TAG, "Config loaded: $config")
-
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load config", e)
         }
