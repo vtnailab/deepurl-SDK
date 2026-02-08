@@ -27,8 +27,13 @@ object ReferrerManager {
                         val response = referrerClient.installReferrer
                         val referrer = response.installReferrer
                         Log.d(TAG, "Referrer = $referrer")
-                        ApiClient.sendReferrer(referrer = referrer ?: "", packageName = context.packageName)
-                        prefs.edit().putBoolean(KEY_REFERRER_SENT, true).putInt(KEY_LAST_VERSION, currentVersion).apply()
+                        if (referrer?.contains("clickId") == true) {
+                            ApiClient.sendReferrer(referrer = referrer ?: "", packageName = context.packageName)
+                            prefs.edit().putBoolean(KEY_REFERRER_SENT, true).putInt(KEY_LAST_VERSION, currentVersion).apply()
+                            Log.d(TAG, "clickId found. Referrer sent.")
+                        } else {
+                            Log.d(TAG, "No clickId found. Skipping API call.")
+                        }
                     }
                     referrerClient.endConnection()
                 }
