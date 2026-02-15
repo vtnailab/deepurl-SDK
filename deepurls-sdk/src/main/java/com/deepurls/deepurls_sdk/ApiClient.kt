@@ -8,6 +8,7 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.util.*
 import kotlin.concurrent.thread
+import org.json.JSONArray
 
 object ApiClient {
 
@@ -16,6 +17,28 @@ object ApiClient {
     private fun generateNonce(): String {
         return UUID.randomUUID().toString().replace("-", "")
     }
+
+    fun canonicalize(value: Any?): Any? {
+        return when (value) {
+            is JSONObject -> {
+                val sortedKeys = value.keys().asSequence().toList().sorted()
+                val newObj = JSONObject()
+                for (key in sortedKeys) {
+                    newObj.put(key, canonicalize(value.get(key)))
+                }
+                newObj
+            }
+            is JSONArray -> {
+                val newArray = JSONArray()
+                for (i in 0 until value.length()) {
+                    newArray.put(canonicalize(value.get(i)))
+                }
+                newArray
+            }
+            else -> value
+        }
+    }
+
     fun sendReferrer(referrer: String, packageName: String) {
         val cfg = DeepUrls.getConfig()
         thread {
@@ -26,8 +49,14 @@ object ApiClient {
                     put("appId", cfg.appId)
                     put("referrer", referrer)
                 }
-                val signaturePayload = """{"appId":"${cfg.appId}","referrer":"$referrer","timestamp":${timestamp.toInt()},"nonce":"$nonce"}"""
-                val signature = CryptoUtils.hmacSha256(signaturePayload, cfg.deepKey)
+                val signaturePayload = JSONObject().apply {
+                    put("appId", cfg.appId)
+                    put("referrer", referrer)
+                    put("timestamp", timestamp.toInt())
+                    put("nonce", nonce)
+                }
+                val canonicalPayload = canonicalize(signaturePayload) as JSONObject
+                val signature = CryptoUtils.hmacSha256(canonicalPayload.toString(), cfg.deepKey)
                 val request = Request.Builder()
                     .url("https://us-central1-v3deeplinks.cloudfunctions.net/postReferrer")
                     .addHeader("x-timestamp", timestamp)
@@ -63,9 +92,17 @@ object ApiClient {
                     put("timestamp", timestamp.toInt())
                     put("nonce", nonce)
                 }
-                val paramsJson = JSONObject(params).toString()
-                val signaturePayload = """{"appId":"${cfg.appId}","route":"$route","params":$paramsJson,"timestamp":${timestamp.toInt()},"nonce":"$nonce"}"""
-                val signature = CryptoUtils.hmacSha256(signaturePayload.toString(), cfg.deepKey)
+                val signaturePayload = JSONObject().apply {
+                    put("appId", cfg.appId)
+                    put("route", route)
+                    put("params", JSONObject(params))
+                    put("timestamp", timestamp.toInt())
+                    put("nonce", nonce)
+                }
+                val canonicalPayload = canonicalize(signaturePayload) as JSONObject
+                val canonicalString = canonicalPayload.toString().replace("\\/", "/")
+                Log.d("DeepUrlsSDK", "Android payload: $canonicalString")
+                val signature = CryptoUtils.hmacSha256(canonicalString, cfg.deepKey)
                 val body = bodyJson.toString().toRequestBody("application/json".toMediaType())
                 val request = Request.Builder()
                     .url("https://us-central1-v3deeplinks.cloudfunctions.net/postGenerateLink")
